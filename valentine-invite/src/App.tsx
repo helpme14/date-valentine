@@ -8,6 +8,7 @@ function clamp(n: number, min: number, max: number) {
 
 export default function App() {
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const noButtonRef = useRef<HTMLButtonElement | null>(null);
   const chargeTimer = useRef<number | null>(null);
   const catchTimer = useRef<number | null>(null);
 
@@ -19,7 +20,7 @@ export default function App() {
   const [catchCount, setCatchCount] = useState(0);
   const [catchPos, setCatchPos] = useState({ x: 50, y: 50 });
   const [phase, setPhase] = useState<Phase>("ask");
-  const [noPos, setNoPos] = useState({ x: 200, y: 16 });
+  const [noPos, setNoPos] = useState({ x: 16, y: 16 });
   const [noDodges, setNoDodges] = useState(0);
 
   const tetrisCols = 5;
@@ -37,28 +38,61 @@ export default function App() {
 
   const canDodge = useMemo(() => noDodges < 6, [noDodges]);
 
+  const getNoButtonSize = () => {
+    const button = noButtonRef.current;
+    return {
+      w: button?.offsetWidth ?? 120,
+      h: button?.offsetHeight ?? 44,
+    };
+  };
+
+  const clampNoPosition = () => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const rect = stage.getBoundingClientRect();
+    const { w, h } = getNoButtonSize();
+    const maxX = Math.max(0, rect.width - w);
+    const maxY = Math.max(0, rect.height - h);
+    setNoPos((pos) => ({
+      x: clamp(pos.x, 0, maxX),
+      y: clamp(pos.y, 0, maxY),
+    }));
+  };
+
   const moveNo = () => {
     const stage = stageRef.current;
     if (!stage) return;
 
     const rect = stage.getBoundingClientRect();
     const padding = 12;
-    const buttonWidth = 120;
-    const buttonHeight = 44;
-    const maxX = rect.width - buttonWidth - padding;
-    const maxY = rect.height - buttonHeight - padding;
+    const { w: buttonWidth, h: buttonHeight } = getNoButtonSize();
+
+    // available space inside the stage minus padding
+    const availableWidth = Math.max(0, rect.width - buttonWidth - padding * 2);
+    const availableHeight = Math.max(
+      0,
+      rect.height - buttonHeight - padding * 2,
+    );
+
+    // pick a position inside the available area; if there's no room, fallback to centering
+    let nextX =
+      availableWidth > 0
+        ? padding + Math.random() * availableWidth
+        : Math.max(padding, (rect.width - buttonWidth) / 2);
+    let nextY =
+      availableHeight > 0
+        ? padding + Math.random() * availableHeight
+        : Math.max(padding, (rect.height - buttonHeight) / 2);
 
     const safeZone = {
       x: 0,
-      y: Math.max(0, maxY - 70),
-      w: 170,
-      h: 70,
+      y: Math.max(0, rect.height - buttonHeight - 70 - padding),
+      w: Math.min(170, rect.width - padding * 2),
+      h: Math.min(70, rect.height - padding * 2),
     };
 
-    let nextX = clamp(Math.random() * maxX, padding, maxX);
-    let nextY = clamp(Math.random() * maxY, padding, maxY);
-
-    for (let i = 0; i < 10; i += 1) {
+    // avoid safe zone with a limited number of retries
+    for (let i = 0; i < 8; i += 1) {
       const overlapsSafeZone =
         nextX < safeZone.x + safeZone.w &&
         nextX + buttonWidth > safeZone.x &&
@@ -67,9 +101,15 @@ export default function App() {
 
       if (!overlapsSafeZone) break;
 
-      nextX = clamp(Math.random() * maxX, padding, maxX);
-      nextY = clamp(Math.random() * maxY, padding, maxY);
+      nextX =
+        availableWidth > 0 ? padding + Math.random() * availableWidth : nextX;
+      nextY =
+        availableHeight > 0 ? padding + Math.random() * availableHeight : nextY;
     }
+
+    // final clamp to ensure we don't place outside the stage
+    nextX = clamp(nextX, 0, Math.max(0, rect.width - buttonWidth));
+    nextY = clamp(nextY, 0, Math.max(0, rect.height - buttonHeight));
 
     setNoPos({ x: nextX, y: nextY });
     setNoDodges((v) => v + 1);
@@ -114,6 +154,13 @@ export default function App() {
   };
 
   useEffect(() => () => stopCharge(), []);
+
+  useEffect(() => {
+    const handleResize = () => clampNoPosition();
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     if (openingStage !== "catch") return;
@@ -384,6 +431,7 @@ export default function App() {
                           }}
                         >
                           <button
+                            ref={noButtonRef}
                             onMouseEnter={onNoIntent}
                             onMouseDown={onNoIntent}
                             onTouchStart={onNoIntent}
