@@ -313,7 +313,7 @@ export default function App() {
                   <p className="text-sm font-semibold tracking-wide text-cyan-300">
                     shinggg ✨
                   </p>
-                  <p className="text-xs text-slate-300">The letter appears…</p>
+                  <p className="text-xs text-slate-300">hahahaahha…</p>
                 </div>
               )}
             </div>
